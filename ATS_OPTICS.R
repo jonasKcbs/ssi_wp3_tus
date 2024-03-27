@@ -17,41 +17,6 @@ spatial_threshold_meter = 50
 temporal_threshold_seconds = FALSE
 SDs = c()
 
-calc_distance <- function (p1,p2)
-{
-    distm (c(p1[["lon"]], p1[["lat"]]), c(p2[["lon"]], p2[["lat"]]), fun = distHaversine)
-}
-
-calc_distances <- function (trajectory)
-{
-    distances = list()
-    n = nrow(trajectory)
-    i = 2
-    distances[1] = 0
-    while(i <= n)
-    {
-        distances[i] = calc_distance(trajectory[i-1,],trajectory[i])
-        i = i + 1
-    }
-    as.numeric(distances)
-}
-
-calc_difftime <- function(trajectory)
-{
-    diffs = list()
-    n = nrow(trajectory)
-    i = 2
-    diffs[1] = 0
-    while(i <= n)
-    {
-        t_prev = trajectory[i-1,][["timestamp"]]
-        t_cur = trajectory[i,][["timestamp"]]
-        diffs[i] = difftime(t_cur,t_prev, units = "secs")
-        i = i + 1
-    }
-    as.numeric(diffs)
-}
-
 calc_SDs <- function(trajectory)
 {
     col_lon <- trajectory$lon
@@ -147,10 +112,6 @@ calc_modified_thompson_tau <- function ()
 
 make_segmented_trajectory <- function (trajectory, temporal_threshold_seconds=FALSE, do_plot=FALSE)
 {
-    # calculate distances: 'd' at index i is distance between i and i+1
-    trajectory = cbind(trajectory,data.table(d_prev=calc_distances(trajectory)))
-    trajectory = cbind(trajectory,data.table(t_prev=calc_difftime(trajectory)))
-
     # some preprocessing
     SDs <<- calc_SDs(trajectory)
 
@@ -188,23 +149,17 @@ get_split_points <- function (segmented_trajectory)
     rbindlist(l)
 }
 
-#duration <- function (cluster)
-#{
-    #f <- first(cluster)
-    #l <- last(cluster)
-    #difftime(l$timestamp,f$timestamp, units = "secs")
-#}
-
 radius <- function (cluster, lon_mean, lat_mean)
 {
-    distances_from_radius = c()
+    dmax = 0
     for(i in 1:nrow(cluster)) {
-        d = distm (c(cluster[i,][['lon']],cluster[i,][['lat']]), c(lon_mean, lat_mean), fun = distHaversine)
-        distances_from_radius <- append(distances_from_radius,d)
+        d = haversine(cluster[i,][['lat']],cluster[i,][['lon']], lat_mean, lon_mean)
+        if(d > dmax)
+            dmax = d
     }
     # always add the spatial_threshold_meter as a minimum
     # e.g. if not, in case of 1 stop point the radius would be zero
-    max(distances_from_radius) + spatial_threshold_meter/2
+    dmax + spatial_threshold_meter/2
 }
 
 time_adjust <- function (t,t_next)
@@ -213,7 +168,7 @@ time_adjust <- function (t,t_next)
     # take x minutes that the user was already in transport
     in_transport_seconds = 5*60
 
-    delta_t = difftime(t_next,t, units = "secs")
+    delta_t = calc_time_diff(t_next,t)
     if(delta_t > temporal_threshold_seconds)
     {
         if(t + temporal_threshold_seconds > t_next - in_transport_seconds)
@@ -274,8 +229,7 @@ make_cluster <- function(trajectory,start_index,stop_index,event)
                 'lat'=c(lat_mean),
                 'time_start'=time_start,
                 'time_end'=time_end,
-                'duration'=c(difftime(time_end,time_start, units = "secs")),
-                #'duration'=c(duration(df)),
+                'duration'=c(calc_time_diff(time_end,time_start)),
                 'radius'=c(radius(df,lon_mean,lat_mean)),
                 'event'=event)
 }
@@ -290,7 +244,7 @@ calc_distances_split_points <- function (trajectory, split_points)
     {
         prev_sp = split_points[i-1,]
         sp = split_points[i,]
-        distances[i] = sum(calc_distances(trajectory[prev_sp$index:sp$index,]))
+        distances[i] = sum(as.numeric(trajectory[(1+prev_sp$index):sp$index,]$d_prev))
         i = i + 1
     }
     as.numeric(distances)
@@ -403,7 +357,7 @@ add_tracks <- function(trajectory,stop_clusters)
             t_end_prev = trajectory[prev_index_end,]$timestamp
             t_start = trajectory[index_start,]$timestamp
 
-            if(difftime(t_start,t_end_prev,units='secs') > temporal_threshold_seconds)
+            if(calc_time_diff(t_start,t_end_prev) > temporal_threshold_seconds)
             {
                 # add track
                 clusters <- rbind(clusters,make_cluster(trajectory,prev_index_end,index_start,'track'))
@@ -435,15 +389,42 @@ ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_thresh
     spatial_threshold_meter <<- spatial_threshold_meter
     temporal_threshold_seconds <<- temporal_threshold_seconds
     trajectory <- tibble::rowid_to_column(trajectory,'index')
+
+    # calculate distances: 'd' at index i is distance between i and i+1
+    start_time <- Sys.time()
+    col_lon <- trajectory$lon
+    col_lat <- trajectory$lat
+    trajectory = cbind(trajectory,d_prev=calc_distances(col_lon,col_lat))
+    end_time <- Sys.time()
+    print(paste("Trajectory distances:",end_time-start_time))
+
+    start_time <- Sys.time()
+    trajectory = cbind(trajectory,data.table(t_prev=calc_time_diffs(trajectory$timestamp)))
+    end_time <- Sys.time()
+    print(paste("Trajectory timediffs:",end_time-start_time))
+
+    start_time <- Sys.time()
     segmented_trajectory <- make_segmented_trajectory(trajectory,temporal_threshold_seconds)
+    end_time <- Sys.time()
+    print(paste("Segmented trajectory:",end_time-start_time))
+
+    start_time <- Sys.time()
     split_points <- get_split_points(segmented_trajectory)
     split_points = cbind(split_points,
                             data.table(d_prev2=calc_distances_split_points(trajectory,split_points)),
-                            data.table(t_prev2=calc_difftime(split_points)))
-    #print(split_points, n=Inf)
+                            data.table(t_prev2=calc_time_diffs(split_points$timestamp)))
+    end_time <- Sys.time()
+    print(paste("Split points with diffs:",end_time-start_time))
 
+    start_time <- Sys.time()
     stop_clusters <- splitpoints_to_stopclusters(trajectory,split_points)
+    end_time <- Sys.time()
+    print(paste("Stop clusters:",end_time-start_time))
+
+    start_time <- Sys.time()
     clusters <- add_tracks(trajectory,stop_clusters)
+    end_time <- Sys.time()
+    print(paste("With tracks:",end_time-start_time))
 
     clusters
     #list(split_points=split_points,clusters=clusters)
