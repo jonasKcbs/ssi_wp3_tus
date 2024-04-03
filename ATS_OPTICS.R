@@ -189,9 +189,9 @@ time_adjust <- function (t,t_next)
 
 # for a stop: add temporal_threshold_seconds at the end
 # for a track: add temporal_threshold_seconds at the front
-make_cluster <- function(trajectory,start_index,stop_index,event)
+make_cluster <- function(trajectory,start_index,end_index,event,real_start_index=NA,real_end_index=NA)
 {
-    df = trajectory[start_index:stop_index,]
+    df = trajectory[start_index:end_index,]
     lon_mean = mean(df$lon)
     lat_mean = mean(df$lat)
 
@@ -202,10 +202,10 @@ make_cluster <- function(trajectory,start_index,stop_index,event)
     {
         time_start = trajectory[start_index,]$timestamp
 
-        t_end = trajectory[stop_index,]$timestamp
-        if(stop_index < n)
+        t_end = trajectory[end_index,]$timestamp
+        if(end_index < n)
         {
-            t_next = trajectory[stop_index+1,]$timestamp
+            t_next = trajectory[end_index+1,]$timestamp
             time_end = time_adjust(t_end,t_next)
         }
         else
@@ -213,6 +213,9 @@ make_cluster <- function(trajectory,start_index,stop_index,event)
             # if last index then add temporal threshold to the stop (min. stop cluster duration)
             time_end = t_end + temporal_threshold_seconds
         }
+
+        real_start_index = start_index
+        real_end_index = end_index
     }
     else if(event == 'track')
     {
@@ -220,11 +223,11 @@ make_cluster <- function(trajectory,start_index,stop_index,event)
         t_next = trajectory[start_index+1,]$timestamp
         time_start = time_adjust(t_start,t_next)
 
-        time_end = trajectory[stop_index,]$timestamp
+        time_end = trajectory[end_index,]$timestamp
     }
 
-    data.frame('index_start'=start_index,
-                'index_end'=stop_index,
+    data.frame('index_start'=real_start_index,
+                'index_end'=real_end_index,
                 'lon'=c(lon_mean),
                 'lat'=c(lat_mean),
                 'time_start'=time_start,
@@ -344,7 +347,7 @@ add_tracks <- function(trajectory,stop_clusters)
             if(index_start != 1)
             {
                 # start with a track if there are tracking points before the first stop cluster
-                clusters <- rbind(clusters,make_cluster(trajectory,1,index_start,'track'))
+                clusters <- rbind(clusters,make_cluster(trajectory,1,index_start,'track',1,index_start-1))
             }
         }
         else
@@ -360,7 +363,19 @@ add_tracks <- function(trajectory,stop_clusters)
             if(calc_time_diff(t_start,t_end_prev) > temporal_threshold_seconds)
             {
                 # add track
-                clusters <- rbind(clusters,make_cluster(trajectory,prev_index_end,index_start,'track'))
+                if(prev_index_end+1 == index_start)
+                {
+                    # track has no tracking points
+                    real_start_index = NA
+                    real_end_index = NA
+                }
+                else
+                {
+                    # track has tracking points
+                    real_start_index = prev_index_end + 1
+                    real_end_index = index_start - 1
+                }
+                clusters <- rbind(clusters,make_cluster(trajectory,prev_index_end,index_start,'track',real_start_index,real_end_index))
             }
             else
             {
@@ -378,7 +393,7 @@ add_tracks <- function(trajectory,stop_clusters)
     # there are tracking points after the last stop cluster => make track cluster
     if(nrow(trajectory) > prev_index_end)
     {
-        clusters <- rbind(clusters,make_cluster(trajectory,prev_index_end+1,nrow(trajectory),'track'))
+        clusters <- rbind(clusters,make_cluster(trajectory,prev_index_end,nrow(trajectory),'track',prev_index_end+1,nrow(trajectory)))
     }
 
     clusters
@@ -428,4 +443,23 @@ ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_thresh
 
     clusters
     #list(split_points=split_points,clusters=clusters)
+}
+
+add_cluster_id_to_trajectory <- function(trajectory, ats_clusters)
+{
+    cluster_id = c()
+    for(i in 1:nrow(ats_clusters))
+    {
+        cluster <- ats_clusters[i,]
+        index_start <- cluster$index_start
+        index_end <- cluster$index_end
+        if(!is.na(index_start) && !is.na(index_end))
+        {
+            for(j in index_start:index_end)
+            {
+                cluster_id <- append(cluster_id,i)
+            }
+        }
+    }
+    trajectory <- cbind(trajectory,cluster_id)
 }
