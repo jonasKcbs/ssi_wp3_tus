@@ -441,6 +441,9 @@ ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_thresh
     end_time <- Sys.time()
     print(paste("With tracks:",end_time-start_time))
 
+    cluster_id = seq(1,nrow(clusters))
+    clusters <- cbind(cluster_id, clusters)
+
     clusters
     #list(split_points=split_points,clusters=clusters)
 }
@@ -461,5 +464,5 @@ add_cluster_id_to_trajectory <- function(trajectory, ats_clusters)
             }
         }
     }
-    trajectory <- cbind(trajectory,cluster_id)
+    trajectory <- cbind(cluster_id, trajectory)
 }
