@@ -128,6 +128,7 @@ double SD(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const 
     return R_PosInf;
 }
 
+// [[Rcpp::export]]
 Rcpp::NumericVector calc_SDs(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::NumericVector& timestamps, const int spatial_threshold_meter) {
     Rcpp::NumericVector results;
     int n = lon.size();
@@ -155,10 +156,8 @@ int segmented_trajectory_get_e(const Rcpp::NumericVector& SDs, const int s, cons
 }
 
 // [[Rcpp::export]]
-List ats_get_split_points(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::NumericVector& timestamps, int temporal_threshold_seconds, int spatial_threshold_meter)
+List ats_get_split_points(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::NumericVector& timestamps, const Rcpp::NumericVector& SDs, int temporal_threshold_seconds, int spatial_threshold_meter)
 {
-    Rcpp::NumericVector SDs = calc_SDs(lon,lat,timestamps,spatial_threshold_meter);
-
     int n = lon.size();
     List segmented_trajectory;
 
