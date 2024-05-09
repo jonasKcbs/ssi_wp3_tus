@@ -1,0 +1,26 @@
+version: "3"
+services:
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    environment:
+      - "RABBITMQ_DEFAULT_USER=geo"
+      - "RABBITMQ_DEFAULT_PASS=georabbithare"
+      - "RABBITMQ_DEFAULT_VHOST=vhost_geoservice"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - "storage-rabbitmq:/var/lib/rabbitmq"
+
+  geoservice:
+    image: "geoservice"
+    depends_on:
+      - "rabbitmq"
+    environment:
+      - "DISPLAY::1"
+    volumes:
+      - "/home/pbeyens/git/ssi_wp3_tus:/home/geo/code"
+
+volumes:
+  storage-rabbitmq:
+
