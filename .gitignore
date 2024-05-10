@@ -4,3 +4,4 @@ config.csv
 params.py
 __pycache__
 *sh
+.RData

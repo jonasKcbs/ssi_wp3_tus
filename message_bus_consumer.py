@@ -7,6 +7,7 @@ import signal
 import concurrent.futures
 import params
 from subprocess import STDOUT, check_output
+import pandas as pd
 
 def create_channel():
     cred_params = pika.credentials.PlainCredentials(params.rabbitmq_user, params.rabbitmq_password)
@@ -26,20 +27,41 @@ def create_channel():
     #print(f"queue declared and bound: {params.rabbitmq_queue_processed}")
     return channel
 
-def process():
-    return check_output(params.command, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
+def geoservice_body2csv(body):
+    data = json.loads(body)
+
+    id = data['id']
+    geopoints = data['geopoints']
+    geolocations = data['geolocations']
+
+    df = pd.DataFrame.from_dict(geopoints)
+    path_geopoints = "/tmp/" + id + "-geopoints.csv"
+    df.to_csv(path_geopoints, encoding='utf-8', index=False)
+
+    df = pd.DataFrame.from_dict(geolocations)
+    path_geolocations = "/tmp/" + id + "-geolocations.csv"
+    df.to_csv(path_geolocations, encoding='utf-8', index=False)
+
+    return path_geopoints, path_geolocations
+
+def geoservice_process(body):
+    # write to csv for R
+    path_geopoints, path_geolocations = geoservice_body2csv(body)
+
+    cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + path_geopoints + " " + path_geolocations
+    return check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
 
 def on_message(channel, method_frame, header_frame, body):
     print('message received')
     print(method_frame)
     print(header_frame)
     print(body)
-    result = process()
+    result = geoservice_process(body)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
     channel.basic_publish(
         exchange=params.rabbitmq_exchange,
         routing_key=params.rabbitmq_queue_processed,
-        body=body,
+        body=result,
     )
 
 def main():

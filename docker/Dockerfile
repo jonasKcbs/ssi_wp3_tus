@@ -13,7 +13,7 @@ RUN R -e "install.packages('remotes')"
 RUN apt-get install -y firefox-esr
 
 ### python
-RUN apt install -y python3 python3-pika
+RUN apt install -y python3 python3-pika python3-pandas
 
 RUN useradd -u 1000 geo -g nogroup
 USER geo

@@ -139,6 +139,7 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
     col_timestamp <- trajectory$timestamp
 
     clusters = data.table()
+
     prev_index_start = 0
     prev_index_end = 0
     indices_start = stop_clusters$index_start
@@ -166,7 +167,7 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
             t_end_prev = trajectory[prev_index_end,]$timestamp
             t_start = trajectory[index_start,]$timestamp
 
-            if(calc_time_diff(t_start,t_end_prev) > temporal_threshold_seconds)
+            if( t_start-t_end_prev > temporal_threshold_seconds)
             {
                 # add track
                 if(prev_index_end+1 == index_start)
@@ -207,9 +208,9 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
 
 ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_threshold_meter=50,new_cluster_threshold_meter=500)
 {
-    print(paste("Temporal threshold:          ",temporal_threshold_seconds))
-    print(paste("Spatial  threshold:          ",spatial_threshold_meter))
-    print(paste("Optics new cluster threshold:",new_cluster_threshold_meter))
+    print(paste("Temporal threshold (s):          ",temporal_threshold_seconds))
+    print(paste("Spatial  threshold (s):          ",spatial_threshold_meter))
+    print(paste("Optics new cluster threshold (m):",new_cluster_threshold_meter))
     trajectory <- tibble::rowid_to_column(trajectory,'index')
 
     col_lon <- trajectory$lon
@@ -220,19 +221,19 @@ ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_thresh
     start_time <- Sys.time()
     trajectory = cbind(trajectory,d_prev=calc_distances(col_lon,col_lat))
     end_time <- Sys.time()
-    print(paste("Trajectory distances:",end_time-start_time))
-
-    # calculate SDs
-    start_time <- Sys.time()
-    trajectory = cbind(trajectory,data.table(t_prev=calc_time_diffs(col_timestamp)))
-    end_time <- Sys.time()
-    print(paste("Trajectory timediffs:",end_time-start_time))
+    print(paste("Trajectory distances:",difftime(end_time,start_time,units="secs"),"secs"))
 
     # calculate time diffs
     start_time <- Sys.time()
+    trajectory = cbind(trajectory,data.table(t_prev=calc_time_diffs(col_timestamp)))
+    end_time <- Sys.time()
+    print(paste("Trajectory timediffs:",difftime(end_time,start_time,units="secs"),"secs"))
+
+    # calculate SDs
+    start_time <- Sys.time()
     SDs <- calc_SDs(col_lon,col_lat,col_timestamp,spatial_threshold_meter)
     end_time <- Sys.time()
-    print(paste("SDs:",end_time-start_time))
+    print(paste("SDs:",difftime(end_time,start_time,units="secs"),"secs"))
 
     if(temporal_threshold_seconds==FALSE)
     {
@@ -240,28 +241,37 @@ ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_thresh
         temporal_threshold_seconds <- calc_modified_thompson_tau(SDs)
         end_time <- Sys.time()
         print(paste("Using temporal threshold:",temporal_threshold_seconds,"sec"))
-        print(paste("Modified Thompson tau:",end_time-start_time))
+        print(paste("Modified Thompson tau:",difftime(end_time,start_time,units="secs"),"secs"))
     }
 
     start_time <- Sys.time()
     split_point_indices <- ats_get_split_points(col_lon,col_lat,col_timestamp,SDs,temporal_threshold_seconds,spatial_threshold_meter)
-    split_points <- data.table()
-    split_points <- rbindlist(lapply(split_point_indices, function(index) {trajectory[index,]}))
-    split_points = cbind(split_points,
-                            data.table(d_prev2=calc_distances_split_points(trajectory$d_prev,as.numeric(split_point_indices))),
-                            data.table(t_prev2=calc_time_diffs(split_points$timestamp)))
-    end_time <- Sys.time()
-    print(paste("Split points with diffs:",end_time-start_time))
+    if(length(split_point_indices))
+    {
+        split_points <- data.table()
+        split_points <- rbindlist(lapply(split_point_indices, function(index) {trajectory[index,]}))
+        split_points = cbind(split_points,
+                                data.table(d_prev2=calc_distances_split_points(trajectory$d_prev,as.numeric(split_point_indices))),
+                                data.table(t_prev2=calc_time_diffs(split_points$timestamp)))
+        end_time <- Sys.time()
+        print(paste("Split points with diffs:",difftime(end_time,start_time,units="secs"),"secs"))
 
-    start_time <- Sys.time()
-    stop_clusters <- splitpoints_to_stopclusters(trajectory,split_points,temporal_threshold_seconds,spatial_threshold_meter,new_cluster_threshold_meter)
-    end_time <- Sys.time()
-    print(paste("Stop clusters:",end_time-start_time))
+        start_time <- Sys.time()
+        stop_clusters <- splitpoints_to_stopclusters(trajectory,split_points,temporal_threshold_seconds,spatial_threshold_meter,new_cluster_threshold_meter)
+        end_time <- Sys.time()
+        print(paste("Stop clusters:",difftime(end_time,start_time,units="secs"),"secs"))
+    }
+    else
+    {
+        stop_clusters <- data.table()
+    }
+
+    print(stop_clusters)
 
     start_time <- Sys.time()
     clusters <- add_tracks(trajectory,stop_clusters,temporal_threshold_seconds,spatial_threshold_meter)
     end_time <- Sys.time()
-    print(paste("With tracks:",end_time-start_time))
+    print(paste("With tracks:",difftime(end_time,start_time,units="secs"),"secs"))
 
     cluster_id = seq(1,nrow(clusters))
     clusters <- cbind(cluster_id, clusters)
