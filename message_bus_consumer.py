@@ -74,6 +74,9 @@ class GeoMessage:
         df = pd.DataFrame.from_dict(self.geolocations)
         df.to_csv(self.path_geolocations(), encoding='utf-8', index=False)
     
+    def has_geopoints(self):
+        return self.geopoints and len(self.geopoints) > 0
+    
 class GeoService:
     geomsg = None
 
@@ -81,24 +84,35 @@ class GeoService:
         self.geomsg = geomsg
     
     def process(self):
-        # write to csv for R
-        self.geomsg.body2csv()
+        if self.geomsg.has_geopoints():
+            # write to csv for R
+            self.geomsg.body2csv()
 
-        # execute command
-        cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_results() + " " + self.geomsg.path_results2()
-        output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
+            # execute command
+            cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_results() + " " + self.geomsg.path_results2()
+            output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
 
-        # read clusters
-        df = pd.read_csv(self.geomsg.path_results()) #,keep_default_na=False)
-        df = df.replace(np.nan, None)
-        clusters = df.to_dict('records')
+            # read clusters
+            df = pd.read_csv(self.geomsg.path_results()) #,keep_default_na=False)
+            df = df.replace(np.nan, None)
+            df['cluster_id'] = df['cluster_id'].apply(lambda x: x - 1)
+            df['index_start'] = df['index_start'].apply(lambda x: x - 1)
+            df['index_end'] = df['index_end'].apply(lambda x: x - 1)
+            clusters = df.to_dict('records')
 
-        # read tracking points mapped to cluster id
-        df = pd.read_csv(self.geomsg.path_results2()) #,keep_default_na=False, na)
-        df = df.replace(np.nan, None)
-        geopoints = df.to_dict('records')
+            # read tracking points mapped to cluster id
+            df = pd.read_csv(self.geomsg.path_results2()) #,keep_default_na=False, na)
+            df = df.replace(np.nan, None)
+            df['cluster_id'] = df['cluster_id'].apply(lambda x: x - 1)
+            convert_dict = {'id': str}
+            df = df.astype(convert_dict)
+            geopoints = df.to_dict('records')
+        else:
+            clusters = []
+            geopoints = []
 
         result = {}
+        result['id'] = self.geomsg.id
         result['clusters'] = clusters
         result['geopoints'] = geopoints
         json_result = json.dumps(result, allow_nan=False)
@@ -138,6 +152,8 @@ def main():
         print(e)
         if channel:
             channel.stop_consuming()
+        return 1
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())

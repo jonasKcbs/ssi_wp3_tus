@@ -18,8 +18,8 @@ services:
       - "rabbitmq"
     environment:
       - "DISPLAY::1"
-    volumes:
-      - "/home/pbeyens/git/ssi_wp3_tus:/home/geo/code"
+    #volumes:
+      #- "/home/pbeyens/git/ssi_wp3_tus:/home/geo/code"
 
 volumes:
   storage-rabbitmq:

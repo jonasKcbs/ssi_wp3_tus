@@ -5,3 +5,4 @@ params.py
 __pycache__
 *sh
 .RData
+*json
