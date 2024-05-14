@@ -8,6 +8,8 @@ import concurrent.futures
 import params
 from subprocess import STDOUT, check_output
 import pandas as pd
+import numpy as np
+import time
 
 def create_channel():
     cred_params = pika.credentials.PlainCredentials(params.rabbitmq_user, params.rabbitmq_password)
@@ -27,37 +29,91 @@ def create_channel():
     #print(f"queue declared and bound: {params.rabbitmq_queue_processed}")
     return channel
 
-def geoservice_body2csv(body):
-    data = json.loads(body)
+class GeoMessage:
+    data = None
+    id = None
+    geopoints = None
+    geolocations = None
 
-    id = data['id']
-    geopoints = data['geopoints']
-    geolocations = data['geolocations']
+    def __init__(self, json_body):
+        json_body = json_body.decode() # avoid failure in case of byte-like object
+        if json_body == '':
+            raise Exception("empty json body")
+        self.data = json.loads(json_body)
+        if not isinstance(self.data, dict):
+            raise Exception("json not an object")
+        if 'id' in self.data.keys():
+            self.id = self.data['id']
+        else:
+            raise Exception("key 'id' missing")
+        if 'geopoints' in self.data.keys():
+            self.geopoints = self.data['geopoints']
+        else:
+            raise Exception("key 'geopoints' missing")
+        if 'geolocations' in self.data.keys():
+            self.geolocations = self.data['geolocations']
+        else:
+            raise Exception("key 'geolocations' missing")
 
-    df = pd.DataFrame.from_dict(geopoints)
-    path_geopoints = "/tmp/" + id + "-geopoints.csv"
-    df.to_csv(path_geopoints, encoding='utf-8', index=False)
+    def path_geopoints(self):
+        return  "/tmp/geoservice-" + self.id + "-geopoints.csv"
 
-    df = pd.DataFrame.from_dict(geolocations)
-    path_geolocations = "/tmp/" + id + "-geolocations.csv"
-    df.to_csv(path_geolocations, encoding='utf-8', index=False)
+    def path_geolocations(self):
+        return  "/tmp/geoservice-" + self.id + "-geolocations.csv"
 
-    return path_geopoints, path_geolocations
+    def path_results(self):
+        return  "/tmp/geoservice-" + self.id + "-results.csv"
+    
+    def path_results2(self):
+        return  "/tmp/geoservice-" + self.id + "-results2.csv"
+    
+    def body2csv(self):
+        df = pd.DataFrame.from_dict(self.geopoints)
+        df.to_csv(self.path_geopoints(), encoding='utf-8', index=False)
 
-def geoservice_process(body):
-    # write to csv for R
-    path_geopoints, path_geolocations = geoservice_body2csv(body)
+        df = pd.DataFrame.from_dict(self.geolocations)
+        df.to_csv(self.path_geolocations(), encoding='utf-8', index=False)
+    
+class GeoService:
+    geomsg = None
 
-    cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + path_geopoints + " " + path_geolocations
-    return check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
+    def __init__(self, geomsg):
+        self.geomsg = geomsg
+    
+    def process(self):
+        # write to csv for R
+        self.geomsg.body2csv()
+
+        # execute command
+        cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_results() + " " + self.geomsg.path_results2()
+        output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
+
+        # read clusters
+        df = pd.read_csv(self.geomsg.path_results()) #,keep_default_na=False)
+        df = df.replace(np.nan, None)
+        clusters = df.to_dict('records')
+
+        # read tracking points mapped to cluster id
+        df = pd.read_csv(self.geomsg.path_results2()) #,keep_default_na=False, na)
+        df = df.replace(np.nan, None)
+        geopoints = df.to_dict('records')
+
+        result = {}
+        result['clusters'] = clusters
+        result['geopoints'] = geopoints
+        json_result = json.dumps(result, allow_nan=False)
+        print(json_result)
+        return json_result
 
 def on_message(channel, method_frame, header_frame, body):
     print('message received')
     print(method_frame)
     print(header_frame)
     print(body)
-    result = geoservice_process(body)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+    geomsg = GeoMessage(body)
+    geosvc = GeoService(geomsg)
+    result = geosvc.process()
     channel.basic_publish(
         exchange=params.rabbitmq_exchange,
         routing_key=params.rabbitmq_queue_processed,
@@ -65,12 +121,14 @@ def on_message(channel, method_frame, header_frame, body):
     )
 
 def main():
-    try:
-        channel = create_channel()
-    except Exception as e:
-        print(e)
-        print('failed to create channel')
-        return 1
+    channel = None
+    while channel == None:
+        try:
+            channel = create_channel()
+        except Exception as e:
+            print(e)
+        time.sleep(1)
+        
     try:
         channel.basic_consume(
             queue=params.rabbitmq_queue_process, on_message_callback=on_message
@@ -78,7 +136,8 @@ def main():
         channel.start_consuming()
     except Exception as e:
         print(e)
-        channel.stop_consuming()
+        if channel:
+            channel.stop_consuming()
 
 if __name__ == "__main__":
     sys.exit(main())
