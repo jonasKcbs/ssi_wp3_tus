@@ -1,6 +1,7 @@
 library(data.table)
+library(dplyr)
 
-source('ATS_OPTICS.R')
+library(ATSOPTICS)
 
 read_csv_data <- function (filename)
 {

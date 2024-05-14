@@ -10,7 +10,7 @@ library(tidyverse)
 library(dbscan)
 library(Rcpp)
 
-sourceCpp('ATS_OPTICS.cpp')
+sourceCpp('src/ATS_OPTICS.cpp')
 
 calc_SD_bins <- function(SDs)
 {
