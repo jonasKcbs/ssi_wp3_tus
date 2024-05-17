@@ -29,11 +29,12 @@ def create_channel():
     #print(f"queue declared and bound: {params.rabbitmq_queue_processed}")
     return channel
 
-class GeoMessage:
+class GeoRequest:
     data = None
     id = None
     geopoints = None
     geolocations = None
+    settings = None
 
     def __init__(self, json_body):
         json_body = json_body.decode() # avoid failure in case of byte-like object
@@ -42,18 +43,19 @@ class GeoMessage:
         self.data = json.loads(json_body)
         if not isinstance(self.data, dict):
             raise Exception("json not an object")
-        if 'id' in self.data.keys():
-            self.id = self.data['id']
-        else:
-            raise Exception("key 'id' missing")
-        if 'geopoints' in self.data.keys():
-            self.geopoints = self.data['geopoints']
-        else:
-            raise Exception("key 'geopoints' missing")
-        if 'geolocations' in self.data.keys():
-            self.geolocations = self.data['geolocations']
-        else:
-            raise Exception("key 'geolocations' missing")
+        
+        required_keys = ['settings','id','geopoints','geolocations']
+        if not all(k in self.data for k in required_keys):
+            raise Exception("a key is missing")
+
+        self.id = self.data['id']
+        self.geopoints = self.data['geopoints']
+        self.geolocations = self.data['geolocations']
+        self.settings = self.data['settings']
+
+        required_settings_keys = ['accuracy_meter','temporal_threshold_seconds','spatial_threshold_meter','start_new_cluster_meter']        
+        if not all(k in self.settings for k in required_settings_keys):
+            raise Exception("a key in 'settings' is missing")
 
     def path_geopoints(self):
         return  "/tmp/geoservice-" + self.id + "-geopoints.csv"
@@ -61,11 +63,11 @@ class GeoMessage:
     def path_geolocations(self):
         return  "/tmp/geoservice-" + self.id + "-geolocations.csv"
 
-    def path_results(self):
-        return  "/tmp/geoservice-" + self.id + "-results.csv"
+    def path_clusters(self):
+        return  "/tmp/geoservice-" + self.id + "-clusters.csv"
     
-    def path_results2(self):
-        return  "/tmp/geoservice-" + self.id + "-results2.csv"
+    def path_mapping(self):
+        return  "/tmp/geoservice-" + self.id + "-mapping.csv"
     
     def body2csv(self):
         df = pd.DataFrame.from_dict(self.geopoints)
@@ -88,12 +90,17 @@ class GeoService:
             # write to csv for R
             self.geomsg.body2csv()
 
+            s = self.geomsg.settings
+
             # execute command
-            cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_results() + " " + self.geomsg.path_results2()
+            options = "-t " + str(s['temporal_threshold_seconds']) + " -s " + str(s['spatial_threshold_meter']) + \
+                " -c " + str(s['start_new_cluster_meter']) + " -a " + str(s['accuracy_meter'])
+            cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + \
+                options + " " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_clusters() + " " + self.geomsg.path_mapping()
             output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
 
             # read clusters
-            df = pd.read_csv(self.geomsg.path_results()) #,keep_default_na=False)
+            df = pd.read_csv(self.geomsg.path_clusters()) #,keep_default_na=False)
             df = df.replace(np.nan, None)
             df['cluster_id'] = df['cluster_id'].apply(lambda x: x - 1)
             df['index_start'] = df['index_start'].apply(lambda x: x - 1)
@@ -101,7 +108,7 @@ class GeoService:
             clusters = df.to_dict('records')
 
             # read tracking points mapped to cluster id
-            df = pd.read_csv(self.geomsg.path_results2()) #,keep_default_na=False, na)
+            df = pd.read_csv(self.geomsg.path_mapping()) #,keep_default_na=False, na)
             df = df.replace(np.nan, None)
             df['cluster_id'] = df['cluster_id'].apply(lambda x: x - 1)
             convert_dict = {'id': str}
@@ -112,21 +119,22 @@ class GeoService:
             geopoints = []
 
         result = {}
+        result['settings'] = self.geomsg.settings
         result['id'] = self.geomsg.id
         result['clusters'] = clusters
         result['geopoints'] = geopoints
         json_result = json.dumps(result, allow_nan=False)
-        print(json_result)
+        #print(json_result)
         return json_result
 
 def on_message(channel, method_frame, header_frame, body):
     print('message received')
-    print(method_frame)
-    print(header_frame)
+    #print(method_frame)
+    #print(header_frame)
     print(body)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
-    geomsg = GeoMessage(body)
-    geosvc = GeoService(geomsg)
+    georeq = GeoRequest(body)
+    geosvc = GeoService(georeq)
     result = geosvc.process()
     channel.basic_publish(
         exchange=params.rabbitmq_exchange,
