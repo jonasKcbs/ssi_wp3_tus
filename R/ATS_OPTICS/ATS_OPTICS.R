@@ -207,7 +207,7 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
     clusters
 }
 
-ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_threshold_meter=50,new_cluster_threshold_meter=500)
+ATS_OPTICS <- function (trajectory,locations,temporal_threshold_seconds=180,spatial_threshold_meter=50,new_cluster_threshold_meter=500)
 {
     print(paste("Temporal threshold (s):          ",temporal_threshold_seconds))
     print(paste("Spatial  threshold (s):          ",spatial_threshold_meter))
@@ -230,9 +230,12 @@ ATS_OPTICS <- function (trajectory,temporal_threshold_seconds=180,spatial_thresh
     end_time <- Sys.time()
     print(paste("Performance trajectory timediffs:",difftime(end_time,start_time,units="secs"),"secs"))
 
-    # calculate SDs
+    # calculate SDs -> inside a location is always regarded as an infinite stop
     start_time <- Sys.time()
-    SDs <- calc_SDs(col_lon,col_lat,col_timestamp,spatial_threshold_meter)
+    col_loc_lon <- locations$lon
+    col_loc_lat <- locations$lat
+    col_loc_radius <- locations$radius
+    SDs <- calc_SDs(col_lon,col_lat,col_timestamp,spatial_threshold_meter,col_loc_lon,col_loc_lat,col_loc_radius)
     end_time <- Sys.time()
     print(paste("Performance SDs:",difftime(end_time,start_time,units="secs"),"secs"))
 

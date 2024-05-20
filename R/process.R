@@ -42,15 +42,14 @@ main <- function ()
 
     # read and prepare data
     data <- read_csv_data(path_geopoints)
-
-    #print(data)
-
+    geolocations <- read_csv_data(path_geolocations)
     # filter data on accuracy
     data <- data %>% filter(acc < accuracy)
 
     ## ATS
     trajectory <- data.table(timestamp = data$t, lon = data$lon, lat = data$lat)
-    ats_clusters <- ATS_OPTICS(trajectory,
+    locations <- data.table(lon = geolocations$lon, lat = geolocations$lat, radius = geolocations$radius)
+    ats_clusters <- ATS_OPTICS(trajectory, locations,
         temporal_threshold_seconds=temporal_threshold_seconds,
         spatial_threshold_meter=spatial_threshold_meter,
         new_cluster_threshold_meter=new_cluster_threshold_meter)

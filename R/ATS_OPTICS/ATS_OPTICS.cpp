@@ -98,11 +98,33 @@ Rcpp::IntegerVector calc_time_diffs(const Rcpp::IntegerVector& v)
     return diffs;
 }
 
-int SD(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::IntegerVector& timestamps, int i, const int spatial_threshold_meter) {
-    int n = lon.size();
+bool is_in_a_location(double lon, double lat, const Rcpp::NumericVector& loc_lon, const Rcpp::NumericVector& loc_lat, const Rcpp::IntegerVector& loc_radius)
+{
+    int n = loc_lon.size();
+    for(int i=0;i<n;++i)
+    {
+        double h = haversine(lat,lon,loc_lat[i],loc_lon[i]);
+        if(h <= loc_radius[i])
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+int SD(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::IntegerVector& timestamps, int i, const int spatial_threshold_meter,
+    const Rcpp::NumericVector& loc_lon, const Rcpp::NumericVector& loc_lat, const Rcpp::IntegerVector& loc_radius)
+{
     double x_i = lon[i];
     double y_i = lat[i];
     int t_i = timestamps[i];
+
+    if(is_in_a_location(x_i,y_i,loc_lon,loc_lat,loc_radius))
+    {
+        return NA_INTEGER;
+    }
+
+    int n = lon.size();
     int j = i + 1;
     while(j < n)
     {
@@ -120,12 +142,14 @@ int SD(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcp
 }
 
 // [[Rcpp::export]]
-Rcpp::IntegerVector calc_SDs(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::IntegerVector& timestamps, const int spatial_threshold_meter) {
+Rcpp::IntegerVector calc_SDs(const Rcpp::NumericVector& lon, const Rcpp::NumericVector& lat, const Rcpp::IntegerVector& timestamps, const int spatial_threshold_meter,
+    const Rcpp::NumericVector& loc_lon, const Rcpp::NumericVector& loc_lat, const Rcpp::IntegerVector& loc_radius)
+{
     Rcpp::IntegerVector results;
     int n = lon.size();
     for(int i=0;i<n;++i)
     {
-        results.push_back(SD(lon,lat,timestamps,i,spatial_threshold_meter));
+        results.push_back(SD(lon,lat,timestamps,i,spatial_threshold_meter,loc_lon,loc_lat,loc_radius));
     }
     return results;
 }
