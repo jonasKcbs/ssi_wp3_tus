@@ -78,7 +78,34 @@ class GeoRequest:
     
     def has_geopoints(self):
         return self.geopoints and len(self.geopoints) > 0
+
+class GeoTransportModePrediction:
+    mode2priority = {
+        "vehicle": 0,
+        "bicycle": 1,
+        "foot": 2,
+        "unknown": 3
+    }
+
+    transistorsoft_mode2supported_mode = {
+        "in_vehicle": "vehicle",
+        "on_bicycle": "bicycle",
+        "running": "foot",
+        "walking": "foot",
+        "still": "unknown"
+    }
+
+    def __init__(self):
+        pass
     
+    def key_compare(self, mode):
+        return self.mode2priority[mode]
+    
+    def process(self, transistorsoft_input: list) -> list:
+        distinctSet = set(transistorsoft_input)
+        modes = [self.transistorsoft_mode2supported_mode[m] for m in distinctSet]
+        return sorted(set(modes),key=self.key_compare)
+
 class GeoService:
     geomsg = None
 
