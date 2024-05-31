@@ -4,11 +4,19 @@ library(argparse)
 
 library(ATSOPTICS)
 
-read_csv_data <- function (filename)
+read_csv_geopoints <- function (filename)
 {
     # read and prepare data
     data <- read.csv(filename, header=TRUE, sep=",")
     colnames(data) <- c("id","t","lon","lat","acc","metadata")
+    data
+}
+
+read_csv_geolocations <- function (filename)
+{
+    # read and prepare data
+    data <- read.csv(filename, header=TRUE, sep=",")
+    colnames(data) <- c("id","lon","lat","radius","metadata")
     data
 }
 
@@ -41,13 +49,13 @@ main <- function ()
     new_cluster_threshold_meter <- args$new_cluster
 
     # read and prepare data
-    data <- read_csv_data(path_geopoints)
-    geolocations <- read_csv_data(path_geolocations)
+    geopoints <- read_csv_geopoints(path_geopoints)
+    geolocations <- read_csv_geolocations(path_geolocations)
     # filter data on accuracy
-    data <- data %>% filter(acc < accuracy)
+    geopoints <- geopoints %>% filter(acc < accuracy)
 
     ## ATS
-    trajectory <- data.table(timestamp = data$t, lon = data$lon, lat = data$lat)
+    trajectory <- data.table(timestamp = geopoints$t, lon = geopoints$lon, lat = geopoints$lat)
     locations <- data.table(lon = geolocations$lon, lat = geolocations$lat, radius = geolocations$radius)
     ats_clusters <- ATS_OPTICS(trajectory, locations,
         temporal_threshold_seconds=temporal_threshold_seconds,
@@ -56,7 +64,7 @@ main <- function ()
     print(ats_clusters)
     write_csv_data(path_clusters, ats_clusters)
 
-    mapping <- add_cluster_id_to_trajectory(data,ats_clusters)
+    mapping <- add_cluster_id_to_trajectory(geopoints,ats_clusters)
     write_csv_data(path_mapping, mapping)
     #print(ats_clusters)
     #print(mapping)

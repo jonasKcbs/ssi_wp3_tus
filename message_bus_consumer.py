@@ -3,6 +3,7 @@ import sys
 import pika
 from pika.exchange_type import ExchangeType
 import json
+import csv
 import signal
 import concurrent.futures
 import params
@@ -70,11 +71,22 @@ class GeoRequest:
         return  "/tmp/geoservice-" + self.id + "-mapping.csv"
     
     def body2csv(self):
-        df = pd.DataFrame.from_dict(self.geopoints)
-        df.to_csv(self.path_geopoints(), encoding='utf-8', index=False)
+        if len(self.geopoints):
+            df = pd.DataFrame.from_dict(self.geopoints)
+            df.to_csv(self.path_geopoints(), encoding='utf-8', index=False)
+        else:
+            with open(self.path_geopoints(), 'w') as outcsv:
+                writer = csv.writer(outcsv)
+                writer.writerow(['id','t','lon','lat','acc','metadata'])
 
-        df = pd.DataFrame.from_dict(self.geolocations)
-        df.to_csv(self.path_geolocations(), encoding='utf-8', index=False)
+        if len(self.geolocations):
+            df = pd.DataFrame.from_dict(self.geolocations)
+            df.to_csv(self.path_geolocations(), encoding='utf-8', index=False)
+        else:
+            with open(self.path_geolocations(), 'w') as outcsv:
+                writer = csv.writer(outcsv)
+                writer.writerow(['id','lon','lat','radius','metadata'])
+
     
     def has_geopoints(self):
         return self.geopoints and len(self.geopoints) > 0
