@@ -1,0 +1,24 @@
+pipeline {
+  agent {
+    docker {
+      image 'motus-buildenv:latest'
+    }
+  }
+  stages {
+    stage('Build code') {
+      steps {
+        sh 'jenkins/build-code.sh'
+      }
+    }
+    stage('Test code') {
+      steps {
+        sh 'true'
+      }
+    }
+    stage('Build image') {
+      steps {
+        sh 'jenkins/build-image.sh geotracker docker/Dockerfile'
+      }
+    }
+  }
+}
