@@ -3,6 +3,5 @@ config.csv
 .Rproj.user
 params.py
 __pycache__
-*sh
 .RData
 *json
