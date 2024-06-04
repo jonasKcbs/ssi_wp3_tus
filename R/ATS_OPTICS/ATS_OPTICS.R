@@ -11,7 +11,8 @@ library(dbscan)
 library(Rcpp)
 library(purrr)
 
-sourceCpp('src/ATS_OPTICS.cpp')
+
+sourceCpp(Sys.getenv(x="ATS_OPTICS_CPP_FILE", unset="src/ATS_OPTICS.cpp"))
 
 calc_SD_bins <- function(SDs)
 {
