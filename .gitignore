@@ -1,7 +1,8 @@
-config.csv
-*.csv
-.Rproj.user
-params.py
-__pycache__
-.RData
-*json
+/config.csv
+/*.csv
+/.Rproj.user
+/params.py
+/__pycache__
+/.RData
+/*json
+/*sh
