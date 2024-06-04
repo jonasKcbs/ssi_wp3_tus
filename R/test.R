@@ -7,7 +7,7 @@ library(sp)
 library(data.table)
 library(htmltools)
 
-source('MOTUS-data.R')
+source('hbits/MOTUS-data.R')
 
 Sys.setenv("ATS_OPTICS_CPP_FILE"="ATS_OPTICS/ATS_OPTICS.cpp")
 source('ATS_OPTICS/ATS_OPTICS.R')
