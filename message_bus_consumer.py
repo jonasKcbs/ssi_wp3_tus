@@ -45,7 +45,7 @@ class GeoRequest:
         if not isinstance(self.data, dict):
             raise Exception("json not an object")
         
-        required_keys = ['settings','id','geopoints','geolocations']
+        required_keys = ['settings','id','geopoints','geolocations','metadata']
         if not all(k in self.data for k in required_keys):
             raise Exception("a key is missing")
 
@@ -53,6 +53,7 @@ class GeoRequest:
         self.geopoints = self.data['geopoints']
         self.geolocations = self.data['geolocations']
         self.settings = self.data['settings']
+        self.metadata = self.data['metadata']
 
         required_settings_keys = ['accuracy_meter','temporal_threshold_seconds','spatial_threshold_meter','start_new_cluster_meter']        
         if not all(k in self.settings for k in required_settings_keys):
@@ -162,6 +163,7 @@ class GeoService:
         result['id'] = self.geomsg.id
         result['clusters'] = clusters
         result['geopoints'] = geopoints
+        result['metadata'] = self.geomsg.metadata
         json_result = json.dumps(result, allow_nan=False)
         #print(json_result)
         return json_result
