@@ -279,8 +279,7 @@ ATS_OPTICS <- function (trajectory,locations,temporal_threshold_seconds=180,spat
     cluster_id = seq(1,nrow(clusters))
     clusters <- cbind(cluster_id, clusters)
 
-    clusters
-    #list(split_points=split_points,clusters=clusters)
+    list(split_points=split_points,clusters=clusters)
 }
 
 add_cluster_id_to_trajectory <- function(trajectory, ats_clusters)

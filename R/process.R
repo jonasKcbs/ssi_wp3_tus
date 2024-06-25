@@ -57,10 +57,12 @@ main <- function ()
     ## ATS
     trajectory <- data.table(timestamp = geopoints$t, lon = geopoints$lon, lat = geopoints$lat)
     locations <- data.table(lon = geolocations$lon, lat = geolocations$lat, radius = geolocations$radius)
-    ats_clusters <- ATS_OPTICS(trajectory, locations,
+    ats <- ATS_OPTICS(trajectory, locations,
         temporal_threshold_seconds=temporal_threshold_seconds,
         spatial_threshold_meter=spatial_threshold_meter,
         new_cluster_threshold_meter=new_cluster_threshold_meter)
+    ats_clusters <- ats$clusters
+    split_points <- ats$split_points
     print(ats_clusters)
     write_csv_data(path_clusters, ats_clusters)
 
