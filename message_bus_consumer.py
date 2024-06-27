@@ -137,14 +137,15 @@ class GeoService:
                 " -c " + str(s['start_new_cluster_meter']) + " -a " + str(s['accuracy_meter'])
             cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + \
                 options + " " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_clusters() + " " + self.geomsg.path_mapping()
+            print(cmd)
             output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
 
             # read clusters
             df = pd.read_csv(self.geomsg.path_clusters()) #,keep_default_na=False)
             df = df.replace(np.nan, None)
             df['cluster_id'] = df['cluster_id'].apply(lambda x: x - 1)
-            df['index_start'] = df['index_start'].apply(lambda x: x - 1)
-            df['index_end'] = df['index_end'].apply(lambda x: x - 1)
+            df['index_start'] = df['index_start'].apply(lambda x: x if x == 'NA' else x - 1)
+            df['index_end'] = df['index_end'].apply(lambda x: x if x == 'NA' else x - 1)
             clusters = df.to_dict('records')
 
             # read tracking points mapped to cluster id
@@ -165,43 +166,50 @@ class GeoService:
         result['geopoints'] = geopoints
         result['metadata'] = self.geomsg.metadata
         json_result = json.dumps(result, allow_nan=False)
-        #print(json_result)
+        print(json_result)
         return json_result
 
 def on_message(channel, method_frame, header_frame, body):
-    print('message received')
-    #print(method_frame)
-    #print(header_frame)
-    print(body)
+    print('message received: ')
+    #print(body)
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
+    print('message acked')
     georeq = GeoRequest(body)
+    print('request parsed: ')
+    #print(georeq)
     geosvc = GeoService(georeq)
+    print('geosvc setup done')
     result = geosvc.process()
+    print('processing results: ')
+    #print(result)
     channel.basic_publish(
         exchange=params.rabbitmq_exchange,
         routing_key=params.rabbitmq_queue_processed,
         body=result,
     )
+    print('message published')
 
 def main():
     channel = None
-    while channel == None:
+    while True:
         try:
             channel = create_channel()
         except Exception as e:
             print(e)
-        time.sleep(1)
+            time.sleep(1)
+            continue
         
-    try:
-        channel.basic_consume(
-            queue=params.rabbitmq_queue_process, on_message_callback=on_message
-        )
-        channel.start_consuming()
-    except Exception as e:
-        print(e)
-        if channel:
-            channel.stop_consuming()
-        return 1
+        try:
+            channel.basic_consume(
+                queue=params.rabbitmq_queue_process, on_message_callback=on_message
+            )
+            channel.start_consuming()
+        except Exception as e:
+            print(e)
+            if channel:
+                channel.stop_consuming()
+                channel = None
+            time.sleep(1)
     return 0
 
 if __name__ == "__main__":

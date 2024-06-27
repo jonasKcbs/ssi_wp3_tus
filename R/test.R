@@ -17,6 +17,8 @@ spatial_lines <- function(line_coord) {
   spatial_lines <- SpatialLines(list(Lines(list(line),'route')))
 }
 
+data <- read_motus_data("hbits/tmp/tracking_points_2021-08-28.csv")
+
 #data <- read_motus_data("combined.csv")
 
 #data <- read_motus_data("tmp/tracking_points_2021-12-30.csv")
@@ -27,7 +29,7 @@ spatial_lines <- function(line_coord) {
 #data <- read_motus_data("tmp/tracking_points_2021-08-29.csv")
 
 # read and prepare data
-data <- read_motus_data("tmp/tracking_points_2021-09-26.csv")
+#data <- read_motus_data("tmp/tracking_points_2021-09-26.csv")
 #data <- read_motus_data("tmp/tracking_points_2021-06-10.csv")
 #data <- read_motus_data("tmp/tracking_points_2021-06-11.csv")
 #data <- read_motus_data("tmp/tracking_points_2021-06-12.csv")
@@ -74,7 +76,9 @@ trajectory <- data.table(lon = data$lon, lat = data$lat, timestamp = data$timest
 start_time <- Sys.time()
 locs = data.table()
 locations <- data.table(id = numeric(), lon = numeric(), lat = numeric(), radius = numeric(), metadata = NULL)
-ats_clusters <- ATS_OPTICS(trajectory,locations=locations,temporal_threshold_seconds=0,spatial_threshold_meter=50,new_cluster_threshold_meter=500)
+ats <- ATS_OPTICS(trajectory,locations=locations,temporal_threshold_seconds=180,spatial_threshold_meter=50,new_cluster_threshold_meter=500)
+ats_clusters <- ats$clusters
+split_points <- ats$split_points
 trajectory <- add_cluster_id_to_trajectory(trajectory,ats_clusters)
 end_time <- Sys.time()
 print("performance:")
@@ -93,10 +97,6 @@ ats_contents <- paste0('<strong>',
                 'StartTime: ', ats_clusters$time_start, '<br />',
                 'EndTime: ', ats_clusters$time_end,
               '</strong>') %>% lapply(htmltools::HTML)
-
-#Rprof(NULL)
-#segmented_trajectory <- make_segmented_trajectory(trajectory,180)
-#split_points <- get_split_points(segmented_trajectory)
 
 ## save first row
 first_row = data[1,]
@@ -123,7 +123,7 @@ mymap <- leaflet() %>%
       proportionalToTal = TRUE,
     )) %>%
   addCircles(data = ats_clusters, radius = ats_clusters$radius, color='red', label = ats_contents ,group="ATS") %>%
-  #addCircleMarkers(data = split_points, radius = 4, color = 'red', group="splits") %>%
+  addCircleMarkers(data = split_points, radius = 4, color = 'red', group="splits") %>%
   addLayersControl(
     #baseGroups = c("OSM"),
     overlayGroups = c("tracking points", "tracking points connected", "splits", "ATS"),
