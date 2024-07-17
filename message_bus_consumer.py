@@ -7,7 +7,7 @@ import csv
 import signal
 import concurrent.futures
 import params
-from subprocess import STDOUT, check_output
+from subprocess import STDOUT, check_output, CalledProcessError
 import pandas as pd
 import numpy as np
 import time
@@ -137,15 +137,18 @@ class GeoService:
                 " -c " + str(s['start_new_cluster_meter']) + " -a " + str(s['accuracy_meter'])
             cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + \
                 options + " " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_clusters() + " " + self.geomsg.path_mapping()
-            print(cmd)
-            output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
+            try:
+                output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
+            except CalledProcessError as error:
+                print('CalledProcessError:')
+                print(error.cmd)
+                print(error.output)
 
             # read clusters
             df = pd.read_csv(self.geomsg.path_clusters()) #,keep_default_na=False)
-            df = df.replace(np.nan, None)
             df['cluster_id'] = df['cluster_id'].apply(lambda x: x - 1)
-            df['index_start'] = df['index_start'].apply(lambda x: x if x == 'NA' else x - 1)
-            df['index_end'] = df['index_end'].apply(lambda x: x if x == 'NA' else x - 1)
+            df['index_start'] = df['index_start'].apply(lambda x: x if x == -1 else x - 1)
+            df['index_end'] = df['index_end'].apply(lambda x: x if x == -1 else x - 1)
             clusters = df.to_dict('records')
 
             # read tracking points mapped to cluster id
@@ -166,7 +169,6 @@ class GeoService:
         result['geopoints'] = geopoints
         result['metadata'] = self.geomsg.metadata
         json_result = json.dumps(result, allow_nan=False)
-        print(json_result)
         return json_result
 
 def on_message(channel, method_frame, header_frame, body):

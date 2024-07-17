@@ -175,8 +175,8 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
                 if(prev_index_end+1 == index_start)
                 {
                     # track has no tracking points
-                    real_start_index = NA
-                    real_end_index = NA
+                    real_start_index = -1
+                    real_end_index = -1
                 }
                 else
                 {
@@ -291,7 +291,7 @@ add_cluster_id_to_trajectory <- function(trajectory, ats_clusters)
     {
         index_start <- indices_start[i]
         index_end <- indices_end[i]
-        if(!is.na(index_start) && !is.na(index_end))
+        if(index_start != -1 && index_end != -1)
         {
             for(j in index_start:index_end)
             {
