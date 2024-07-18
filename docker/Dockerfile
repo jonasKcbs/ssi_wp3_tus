@@ -17,19 +17,18 @@ RUN apt-get install -y firefox-esr
 RUN apt install -y python3 python3-pika python3-pandas
 
 ### user
-RUN useradd -u 1000 geo -g nogroup
+RUN useradd -u 1000 geotracker -g nogroup
 
 ### R ATS_OPTICS package
 RUN apt install -y texlive-latex-base # for pdflatex
-ENV PATH_CODE /home/geo/code
+ENV PATH_CODE /opt/hbits/geotracker
 COPY . ${PATH_CODE}
 RUN cd ${PATH_CODE}/R/ATS_OPTICS && R -e "library(Rcpp); Rcpp.package.skeleton('ATSOPTICS',example_code=FALSE,code_files=c('ATS_OPTICS.R'),cpp_files=c('ATS_OPTICS.cpp'))"
 RUN cd ${PATH_CODE}/R/ATS_OPTICS && R CMD build ATSOPTICS
 RUN cd ${PATH_CODE}/R/ATS_OPTICS && R -e "install.packages('ATSOPTICS_1.0.tar.gz', repos = NULL, type='source')"
 
 # change user and workdir
-USER geo
-WORKDIR /home/geo
+USER geotracker
+WORKDIR ${PATH_CODE}
 
-#CMD ["sleep", "infinity"]
-CMD ["python3", "code/message_bus_consumer.py"]
+CMD ["python3", "message_bus_consumer.py"]
