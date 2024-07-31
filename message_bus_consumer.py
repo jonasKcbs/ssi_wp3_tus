@@ -136,7 +136,7 @@ class GeoService:
             cluster_id = p['cluster_id']
             if cluster_id != prev_cluster_id:
                 if prev_cluster_id != -1:
-                    cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)[0]
+                    cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)
                     activities = []
             if p['metadata'] != None:
                 metadata = json.loads(p['metadata'])
@@ -144,7 +144,7 @@ class GeoService:
             else:
                 activities.append('unknown')
             prev_cluster_id = cluster_id
-        cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)[0]
+        cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)
 
         i = 0
         for c in clusters:
