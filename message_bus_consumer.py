@@ -55,7 +55,7 @@ class GeoRequest:
         self.settings = self.data['settings']
         self.metadata = self.data['metadata']
 
-        required_settings_keys = ['accuracy_meter','temporal_threshold_seconds','spatial_threshold_meter','start_new_cluster_meter']        
+        required_settings_keys = ['accuracy_meter','temporal_threshold_seconds','spatial_threshold_meter','start_new_cluster_meter','start_new_cluster_seconds']        
         if not all(k in self.settings for k in required_settings_keys):
             raise Exception("a key in 'settings' is missing")
 
@@ -139,7 +139,7 @@ class GeoService:
                     cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)
                     activities = []
             if p['metadata'] != None:
-                metadata = json.loads(p['metadata'])
+                metadata = json.loads(p['metadata'].replace("\'", "\""))
                 activities.append(metadata['transistorsoft_MotionActivityType'])
             else:
                 activities.append('unknown')
@@ -162,9 +162,10 @@ class GeoService:
 
             # execute command
             options = "-t " + str(s['temporal_threshold_seconds']) + " -s " + str(s['spatial_threshold_meter']) + \
-                " -c " + str(s['start_new_cluster_meter']) + " -a " + str(s['accuracy_meter'])
-            cmd = "cd /home/geo/code/R && /usr/bin/Rscript --vanilla process.R " + \
+                " -n " + str(s['start_new_cluster_meter']) + " -m " + str(s['start_new_cluster_seconds']) + " -a " + str(s['accuracy_meter'])
+            cmd = "cd /opt/hbits/geotracker/R && /usr/bin/Rscript --vanilla process.R " + \
                 options + " " + self.geomsg.path_geopoints() + " " + self.geomsg.path_geolocations() + " " + self.geomsg.path_clusters() + " " + self.geomsg.path_mapping()
+            print(cmd)
             try:
                 output = check_output(cmd, shell=True, stderr=STDOUT, timeout=params.process_timeout_seconds)
             except CalledProcessError as error:

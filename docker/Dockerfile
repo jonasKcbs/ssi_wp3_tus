@@ -21,7 +21,7 @@ RUN useradd -u 1000 geotracker -g nogroup
 
 ### R ATS_OPTICS package
 RUN apt install -y texlive-latex-base # for pdflatex
-ENV PATH_CODE /opt/hbits/geotracker
+ENV PATH_CODE=/opt/hbits/geotracker
 COPY . ${PATH_CODE}
 RUN cd ${PATH_CODE}/R/ATS_OPTICS && R -e "library(Rcpp); Rcpp.package.skeleton('ATSOPTICS',example_code=FALSE,code_files=c('ATS_OPTICS.R'),cpp_files=c('ATS_OPTICS.cpp'))"
 RUN cd ${PATH_CODE}/R/ATS_OPTICS && R CMD build ATSOPTICS
@@ -31,4 +31,4 @@ RUN cd ${PATH_CODE}/R/ATS_OPTICS && R -e "install.packages('ATSOPTICS_1.0.tar.gz
 USER geotracker
 WORKDIR ${PATH_CODE}
 
-CMD ["python3", "message_bus_consumer.py"]
+CMD ["python3", "-u", "message_bus_consumer.py"]

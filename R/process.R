@@ -33,9 +33,10 @@ main <- function ()
     parser$add_argument('path_geoclusters', type="character", help='path to cluster file (output)')
     parser$add_argument('path_geomapping',  type="character", help='path to mapping file (output)')
     parser$add_argument('-a', type="integer", dest="acc",                   default=100,    help='minimal accuray in meters (preprocessing)')
-    parser$add_argument('-t', type="integer", dest="temporal_threshold",    default=180,      help='temporal threshold in seconds (ATS), use 0 for Thompson Tau')
+    parser$add_argument('-t', type="integer", dest="temporal_threshold",    default=180,    help='temporal threshold in seconds (ATS), use 0 for Thompson Tau')
     parser$add_argument('-s', type="integer", dest="spatial_threshold",     default=50,     help='spatial threshold in meter (ATS)')
-    parser$add_argument('-c', type="integer", dest="new_cluster",           default=500,    help='start new cluster threshold in meters (postprocessing)')
+    parser$add_argument('-n', type="integer", dest="new_cluster_meter",           default=500,    help='start new cluster threshold in meters (postprocessing)')
+    parser$add_argument('-m', type="integer", dest="new_cluster_seconds",           default=86400,  help='start new cluster threshold in seconds (postprocessing)')
     args <- parser$parse_args(commandArgs(trailingOnly=TRUE)) 
 
     path_geopoints <- args$path_geopoints
@@ -46,7 +47,8 @@ main <- function ()
     temporal_threshold_seconds <- args$temporal_threshold
     spatial_threshold_meter <- args$spatial_threshold
     accuracy <- args$acc
-    new_cluster_threshold_meter <- args$new_cluster
+    new_cluster_threshold_meter <- args$new_cluster_meter
+    new_cluster_threshold_seconds <- args$new_cluster_seconds
 
     # read and prepare data
     geopoints <- read_csv_geopoints(path_geopoints)
@@ -60,7 +62,8 @@ main <- function ()
     ats <- ATS_OPTICS(trajectory, locations,
         temporal_threshold_seconds=temporal_threshold_seconds,
         spatial_threshold_meter=spatial_threshold_meter,
-        new_cluster_threshold_meter=new_cluster_threshold_meter)
+        new_cluster_threshold_meter=new_cluster_threshold_meter,
+	new_cluster_threshold_seconds=new_cluster_threshold_seconds)
     ats_clusters <- ats$clusters
     split_points <- ats$split_points
     print(ats_clusters)

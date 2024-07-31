@@ -81,7 +81,7 @@ calc_modified_thompson_tau <- function (SDs)
     #list(SD_bins=SD_bins,temporal_threshold_seconds=match(0,res)*60)
 }
 
-splitpoints_to_stopclusters <- function (trajectory, split_points, temporal_threshold_seconds, spatial_threshold_meter, new_cluster_threshold_meter, minPts=1, eps_cl=0.01)
+splitpoints_to_stopclusters <- function (trajectory, split_points, temporal_threshold_seconds, spatial_threshold_meter, new_cluster_threshold_meter, new_cluster_threshold_seconds, minPts=1, eps_cl=0.01)
 {
     col_lon <- trajectory$lon
     col_lat <- trajectory$lat
@@ -108,6 +108,7 @@ splitpoints_to_stopclusters <- function (trajectory, split_points, temporal_thre
     cur_index = 0
 
     d_prev2 = split_points$d_prev2
+    t_prev2 = split_points$t_prev2
     indices = split_points$index
     timestamps = split_points$timestamp
     for (i in 1:nrows)
@@ -117,7 +118,7 @@ splitpoints_to_stopclusters <- function (trajectory, split_points, temporal_thre
         # start new cluster when:
         # - cluster index is different, or
         # - distance difference is too big between 2 stop points
-        if(c != cur_c || d_prev2[i] > new_cluster_threshold_meter)
+        if(c != cur_c || d_prev2[i] > new_cluster_threshold_meter || t_prev2[i] > new_cluster_threshold_seconds)
         {
             if(cur_index != 0)
             {
@@ -134,7 +135,7 @@ splitpoints_to_stopclusters <- function (trajectory, split_points, temporal_thre
     clusters <- rbind(clusters,make_cluster(col_lon,col_lat,col_timestamp,start_index,cur_index,'stop',temporal_threshold_seconds,spatial_threshold_meter))
 }
 
-add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spatial_threshold_meter)
+add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spatial_threshold_meter,new_cluster_threshold_seconds)
 {
     col_lon <- trajectory$lon
     col_lat <- trajectory$lat
@@ -164,7 +165,9 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
             # 2 possibilities depending on time between 2 stops:
             # - almost no time in between -> merge stop clusters
             #   (regardless of inbetween tracking points, and also OPTICS sometimes makes different stop cluster because of density)
-            # - else create a track in between the 2 stop clusters
+            # - else create a track in between the 2 stop clusters _if_
+            #   - tracking points available, or
+            #   - no tracking points but relatively short time between the stops
 
             t_end_prev = trajectory[prev_index_end,]$timestamp
             t_start = trajectory[index_start,]$timestamp
@@ -174,17 +177,21 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
                 # add track
                 if(prev_index_end+1 == index_start)
                 {
-                    # track has no tracking points
-                    real_start_index = -1
-                    real_end_index = -1
+                    if(t_start-t_end_prev < new_cluster_threshold_seconds)
+                    {
+                        # track has no tracking points
+                        real_start_index = -1
+                        real_end_index = -1
+                        clusters <- rbind(clusters,make_cluster(col_lon,col_lat,col_timestamp,prev_index_end,index_start,'track',temporal_threshold_seconds,spatial_threshold_meter,real_start_index,real_end_index))
+                    }
                 }
                 else
                 {
                     # track has tracking points
                     real_start_index = prev_index_end + 1
                     real_end_index = index_start - 1
+                    clusters <- rbind(clusters,make_cluster(col_lon,col_lat,col_timestamp,prev_index_end,index_start,'track',temporal_threshold_seconds,spatial_threshold_meter,real_start_index,real_end_index))
                 }
-                clusters <- rbind(clusters,make_cluster(col_lon,col_lat,col_timestamp,prev_index_end,index_start,'track',temporal_threshold_seconds,spatial_threshold_meter,real_start_index,real_end_index))
             }
             else
             {
@@ -208,11 +215,12 @@ add_tracks <- function(trajectory,stop_clusters,temporal_threshold_seconds,spati
     clusters
 }
 
-ATS_OPTICS <- function (trajectory,locations,temporal_threshold_seconds=180,spatial_threshold_meter=50,new_cluster_threshold_meter=500)
+ATS_OPTICS <- function (trajectory,locations,temporal_threshold_seconds=180,spatial_threshold_meter=50,new_cluster_threshold_meter=500,new_cluster_threshold_seconds=86400)
 {
-    print(paste("Temporal threshold (s):          ",temporal_threshold_seconds))
-    print(paste("Spatial  threshold (s):          ",spatial_threshold_meter))
-    print(paste("Optics new cluster threshold (m):",new_cluster_threshold_meter))
+    print(paste("Temporal threshold (s):              ",temporal_threshold_seconds))
+    print(paste("Spatial  threshold (s):              ",spatial_threshold_meter))
+    print(paste("New cluster threshold (meter):",new_cluster_threshold_meter))
+    print(paste("New cluster threshold (secs): ",new_cluster_threshold_seconds))
     trajectory <- tibble::rowid_to_column(trajectory,'index')
 
     col_lon <- trajectory$lon
@@ -262,7 +270,7 @@ ATS_OPTICS <- function (trajectory,locations,temporal_threshold_seconds=180,spat
         print(paste("Performance split points with diffs:",difftime(end_time,start_time,units="secs"),"secs"))
 
         start_time <- Sys.time()
-        stop_clusters <- splitpoints_to_stopclusters(trajectory,split_points,temporal_threshold_seconds,spatial_threshold_meter,new_cluster_threshold_meter)
+        stop_clusters <- splitpoints_to_stopclusters(trajectory,split_points,temporal_threshold_seconds,spatial_threshold_meter,new_cluster_threshold_meter,new_cluster_threshold_seconds)
         end_time <- Sys.time()
         print(paste("Performance stop clusters:",difftime(end_time,start_time,units="secs"),"secs"))
     }
@@ -272,7 +280,7 @@ ATS_OPTICS <- function (trajectory,locations,temporal_threshold_seconds=180,spat
     }
 
     start_time <- Sys.time()
-    clusters <- add_tracks(trajectory,stop_clusters,temporal_threshold_seconds,spatial_threshold_meter)
+    clusters <- add_tracks(trajectory,stop_clusters,temporal_threshold_seconds,spatial_threshold_meter,new_cluster_threshold_seconds)
     end_time <- Sys.time()
     print(paste("Performance With tracks:",difftime(end_time,start_time,units="secs"),"secs"))
 
