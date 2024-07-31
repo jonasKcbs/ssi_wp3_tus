@@ -97,15 +97,18 @@ class GeoTransportModePrediction:
         "vehicle": 0,
         "bicycle": 1,
         "foot": 2,
-        "unknown": 3
+        "still": 3,
+        "unknown": 4
     }
 
     transistorsoft_mode2supported_mode = {
         "in_vehicle": "vehicle",
         "on_bicycle": "bicycle",
         "running": "foot",
+        "on_foot": "foot",
         "walking": "foot",
-        "still": "unknown"
+        "still": "still",
+        "unknown": "unknown"
     }
 
     def __init__(self):
@@ -124,6 +127,31 @@ class GeoService:
 
     def __init__(self, geomsg):
         self.geomsg = geomsg
+
+    def add_transportmode(self, clusters, geopoints):
+        prev_cluster_id = -1
+        cluster2activities = ['unknown' for i in range(len(clusters))] # note that not all clusters have tracking points
+        activities = []
+        for p in geopoints:
+            cluster_id = p['cluster_id']
+            if cluster_id != prev_cluster_id:
+                if prev_cluster_id != -1:
+                    cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)[0]
+                    activities = []
+            if p['metadata'] != None:
+                metadata = json.loads(p['metadata'])
+                activities.append(metadata['transistorsoft_MotionActivityType'])
+            else:
+                activities.append('unknown')
+            prev_cluster_id = cluster_id
+        cluster2activities[prev_cluster_id] = GeoTransportModePrediction().process(activities)[0]
+
+        i = 0
+        for c in clusters:
+            c['transport_mode'] = cluster2activities[i]
+            i += 1
+    
+        return clusters
     
     def process(self):
         if self.geomsg.has_geopoints():
@@ -158,6 +186,8 @@ class GeoService:
             convert_dict = {'id': str}
             df = df.astype(convert_dict)
             geopoints = df.to_dict('records')
+
+            clusters = self.add_transportmode(clusters, geopoints)
         else:
             clusters = []
             geopoints = []
