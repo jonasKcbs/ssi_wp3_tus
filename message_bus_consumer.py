@@ -130,7 +130,7 @@ class GeoService:
 
     def add_transportmode(self, clusters, geopoints):
         prev_cluster_id = -1
-        cluster2activities = ['unknown' for i in range(len(clusters))] # note that not all clusters have tracking points
+        cluster2activities = [['unknown'] for i in range(len(clusters))] # note that not all clusters have tracking points
         activities = []
         for p in geopoints:
             cluster_id = p['cluster_id']
