@@ -5,7 +5,7 @@ The data was collected in the Netherlands in the summer of 2024 by employees of 
 (Statistics Netherlands) and students from Utrecht University. Three users 
 collected geolocation data using the CBS app on android devices and kept track
 of their movement in diaries. One of the users (UtrechtX) collected data using
-three different accounts and/or phone (Utrecht1, Utrecht2 and Utrecht12). 
+three different accounts and/or phones sometimes on the same journey (Utrecht1, Utrecht2 and Utrecht12). 
 
 Variables in the dataset:
 - user_id: identifier of the user
