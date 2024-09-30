@@ -17,7 +17,7 @@ RUN apt-get install -y firefox-esr
 RUN apt install -y python3 python3-pika python3-pandas
 
 ### user
-RUN useradd -u 1000 geotracker -g nogroup
+RUN useradd -u 1000 geotracker -g nogroup --create-home
 
 ### R ATS_OPTICS package
 RUN apt install -y texlive-latex-base # for pdflatex
