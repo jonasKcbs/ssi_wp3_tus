@@ -14,3 +14,5 @@ Variables in the dataset:
 - longitude: together with latitude this is the observed coordinate of the data point
 - stop: indicator of whether the user was moving (FALSE) or not (TRUE) according to the diary
 - mode: classification of the transportation mode according to the diary
+
+- test
