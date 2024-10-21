@@ -4,8 +4,8 @@ services:
     image: "rabbitmq:3-management"
     environment:
       - "RABBITMQ_DEFAULT_USER=geo"
-      - "RABBITMQ_DEFAULT_PASS=georabbithare"
-      - "RABBITMQ_DEFAULT_VHOST=vhost_geoservice"
+      - "RABBITMQ_DEFAULT_PASS=geo"
+      - "RABBITMQ_DEFAULT_VHOST=vhost_geo"
     ports:
       - "15672:15672"
       - "5672:5672"

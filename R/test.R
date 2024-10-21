@@ -6,63 +6,44 @@ library(leaflet.extras2)
 library(sp)
 library(data.table)
 library(htmltools)
+library(uuid)
 
-source('hbits/MOTUS-data.R')
+options(width=200)
+date = "2024-08-17"
+
 
 Sys.setenv("ATS_OPTICS_CPP_FILE"="ATS_OPTICS/ATS_OPTICS.cpp")
 source('ATS_OPTICS/ATS_OPTICS.R')
+
+save_trips <- function(ats_clusters,trajectory) {
+    indices_start = ats_clusters$index_start
+    indices_end = ats_clusters$index_end
+    events = ats_clusters$event
+    if(nrow(ats_clusters) < 3)
+      return;
+    for(i in 1:(nrow(ats_clusters)-2))
+    {
+        event <- events[i]
+        # track cluster must have tracking points
+        if(event == "stop" && indices_start[i+1] != -1 && indices_end[i+1] != -1) {
+          start = indices_start[i]
+          end = indices_end[i+2]
+          write.csv(trajectory[start:end],paste0("trips/",date,"-",i,".csv"))
+        }
+    }
+}
 
 spatial_lines <- function(line_coord) {
   line <- Line(line_coord)
   spatial_lines <- SpatialLines(list(Lines(list(line),'route')))
 }
 
-data <- read_motus_data("hbits/tmp/tracking_points_2021-08-28.csv")
+source('hbits/MOTUS-data2.R')
+#data <- read_motus_data2(paste0("hbits/tmp/mts_respondentgeotrackingpoints_",date,".csv"))
+#data <- data %>% filter(accuracy < 100)
 
-#data <- read_motus_data("combined.csv")
-
-#data <- read_motus_data("tmp/tracking_points_2021-12-30.csv")
-#data <- read_motus_data("tmp/tracking_points_2022-01-08.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-08-26.csv")
-
-#data <- read_motus_data("tmp/tracking_points_2021-09-26.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-08-29.csv")
-
-# read and prepare data
-#data <- read_motus_data("tmp/tracking_points_2021-09-26.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-06-10.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-06-11.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-06-12.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-06-16.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-06-22.csv")
-
-# has a 0s track
-#data <- read_motus_data("tmp/tracking_points_2021-09-20.csv")
-
-#data <- read_motus_data("tmp/tracking_points_2021-07-01.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-06-30.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-07-02.csv")
-
-# has also short track (ikea)
-#data <- read_motus_data("tmp/tracking_points_2021-08-25.csv")
-#data <- read_motus_data("tmp/tracking_points_2021-08-26.csv")
-# also here merge possible
-#data <- read_motus_data("tmp/tracking_points_2021-08-27.csv")
-# lots of zero's
-#data <- read_motus_data("tmp/tracking_points_2021-08-28.csv")
-
-# important for starting new cluster when distance between 2 stop points is big
-#data <- read_motus_data("tmp/tracking_points_2022-01-15.csv")
-
-# svalbard
-#data <- read_motus_data("tmp/tracking_points_2022-06-06.csv")
-#data <- read_motus_data("tmp/tracking_points_2022-06-08.csv")
-#data <- read_motus_data("tmp/tracking_points_2022-06-09.csv")
-#data <- read_motus_data("tmp/tracking_points_2022-06-12.csv")
-
-data <- data %>% filter(accuracy < 100)
-
-print(data)
+source('hbits/ssi_open_geodata.R')
+data <- read_ssi_open_geodata("hbits/tmp/ssi_open_geodata-Utrecht2-2024-06-08.csv")
 
 #
 data <- setDT(data)
@@ -80,13 +61,18 @@ ats <- ATS_OPTICS(trajectory,locations=locations,temporal_threshold_seconds=180,
 ats_clusters <- ats$clusters
 split_points <- ats$split_points
 trajectory <- add_cluster_id_to_trajectory(trajectory,ats_clusters)
+#save_trips(ats_clusters,trajectory)
 end_time <- Sys.time()
 print("performance:")
 print(end_time -start_time)
 print(ats_clusters)
+
+
+
 print(trajectory)
 #print(tbl_df(trajectory),n=40)
 ats_clusters <- ats_clusters %>% filter(event == 'stop')
+
 #ats_clusters = ats$clusters
 #split_points = ats$split_points
 ats_contents <- paste0('<strong>',
