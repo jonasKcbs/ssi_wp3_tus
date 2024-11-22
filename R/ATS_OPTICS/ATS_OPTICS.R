@@ -94,7 +94,7 @@ splitpoints_to_stopclusters <- function (trajectory, split_points, temporal_thre
     }
     else if(nrows == 1)
     {
-        return(make_cluster(col_lon,col_lat,col_timestamp,1,1,'stop',temporal_threshold_seconds,spatial_threshold_meter))
+        return(make_cluster(col_lon,col_lat,col_timestamp,split_points[1,]$index,split_points[1,]$index,'stop',temporal_threshold_seconds,spatial_threshold_meter))
     }
 
     x <- cbind(x = split_points$lon, y = split_points$lat)
