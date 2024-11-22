@@ -5,6 +5,7 @@ mydata <- read.csv('mts_respondentgeotrackingpoints.csv', header=TRUE, sep=',')
 
 start = 0
 prev_day = ""
+day = ""
 for(i in 1:nrow(mydata))
 {
     row = mydata[i,]
@@ -20,3 +21,6 @@ for(i in 1:nrow(mydata))
     }
     prev_day = day
 }
+
+filename = paste0('tmp/mts_respondentgeotrackingpoints_',str_split(day," ")[[1]][1],'.csv')
+fwrite(mydata[start:nrow(mydata),],filename)
